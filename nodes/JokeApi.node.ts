@@ -93,6 +93,7 @@ export class JokeApi implements INodeType {
                 default: 'getRandom',
                     description: 'Sélectionnez l\'opération à effectuer avec JokeAPI.',
             },
+
             {
                 displayName: 'Random Joke Options',
                 name: 'randomJokeOptions',
@@ -103,24 +104,24 @@ export class JokeApi implements INodeType {
                     },
                 },
                 placeholder: 'Ajouter des options de blague aléatoire',
-                description: 'Configurez les filtres pour la blague aléatoire.',
-                default: {}, // Correction Erreur 2: Ajout de la propriété 'default'
+                description: 'Configurez les filtres pour la blague aléatoire. Note: Des URLs trop longues dues à de nombreux filtres ou une recherche complexe peuvent entraîner des erreurs.',
+                default: {},
                     options: [
                         {
                             displayName: 'Categories',
                             name: 'categories',
-                            type: 'multiOptions', // Le type multiOptions fournit bien un array
+                            type: 'multiOptions',
                             options: jokeCategories,
                 default: ['Any'],
-                    description: 'Sélectionnez une ou plusieurs catégories de blagues à inclure. "Any" inclut toutes les catégories.',
+                    description: 'Sélectionnez une ou plusieurs catégories de blagues à inclure. "Any" inclut toutes les catégories. Note: Un trop grand nombre de catégories peut rendre l\'URL longue.',
                         },
                         {
                             displayName: 'Exclude Flags',
                             name: 'excludeFlags',
-                            type: 'multiOptions', // Le type multiOptions fournit bien un array
+                            type: 'multiOptions',
                             options: blacklistFlags,
                 default: [],
-                    description: 'Sélectionnez les drapeaux de blagues à exclure. Si une blague contient un drapeau sélectionné, elle sera filtrée (ex: NSFW, Racist).',
+                    description: 'Sélectionnez les drapeaux de blagues à exclure. Si une blague contient un drapeau sélectionné, elle sera filtrée (ex: NSFW, Racist). Note: Un trop grand nombre de flags peut rendre l\'URL longue.',
                         },
                         {
                             displayName: 'Joke Type',
@@ -144,7 +145,7 @@ export class JokeApi implements INodeType {
                             type: 'string',
                 default: '',
                     placeholder: 'e.g. "robot"',
-                    description: 'Recherchez une blague contenant ce texte. Note : cette option ne fonctionne que si UNE SEULE catégorie est sélectionnée (pas "Any" et pas plusieurs catégories).',
+                    description: 'Recherchez une blague contenant ce texte. Note : cette option ne fonctionne que si UNE SEULE catégorie est sélectionnée (pas "Any" et pas plusieurs catégories). Une longue chaîne peut rendre l\'URL longue.',
                         },
                         {
                             displayName: 'Amount',
@@ -159,6 +160,7 @@ export class JokeApi implements INodeType {
                         },
                     ],
             },
+
             {
                 displayName: 'Joke ID(s)',
                 name: 'jokeId',
@@ -171,7 +173,7 @@ export class JokeApi implements INodeType {
                             operation: ['getById'],
                         },
                     },
-                    description: 'L\'ID numérique de la blague à récupérer, ou une plage d\'IDs séparée par un tiret (ex: "10-20").',
+                    description: 'L\'ID numérique de la blague à récupérer, ou une plage d\'IDs séparée par un tiret (ex: "10-20"). Les IDs négatifs ne sont pas supportés.',
             },
         ],
         usableAsTool: true,
@@ -196,40 +198,41 @@ export class JokeApi implements INodeType {
                 switch (operation) {
                     case 'getRandom':
                         const randomJokeOptions = this.getNodeParameter('randomJokeOptions', itemIndex) as {
-                            categories: string | string[]; // Ajusté pour accepter string ou string[]
-                            excludeFlags: string | string[]; // Ajusté pour accepter string ou string[]
-                            jokeType: string;
-                            language: string;
-                            searchString: string;
-                            amount: number;
+                            categories?: string | string[]; // Rend optionnel et accepte string ou string[]
+                            excludeFlags?: string | string[]; // Rend optionnel et accepte string ou string[]
+                            jokeType?: string;
+                            language?: string;
+                            searchString?: string;
+                            amount?: number;
                         };
 
-                        // CORRECTION ICI: S'assurer que categories est un tableau
-                        const categories = Array.isArray(randomJokeOptions.categories)
+                        // Assure que categories est un tableau, même si undefined, null ou une string vide
+                        const categories = (Array.isArray(randomJokeOptions.categories) && randomJokeOptions.categories.length > 0)
                         ? randomJokeOptions.categories
-                        : (typeof randomJokeOptions.categories === 'string' && randomJokeOptions.categories)
-                        ? randomJokeOptions.categories.split(',').map(s => s.trim()) // Split si c'est une string
+                        : (typeof randomJokeOptions.categories === 'string' && randomJokeOptions.categories.trim() !== '')
+                        ? randomJokeOptions.categories.split(',').map(s => s.trim()).filter(Boolean) // split et filtre les vides
                         : [];
 
-                        // CORRECTION ICI: S'assurer que excludeFlags est un tableau
-                        const excludeFlags = Array.isArray(randomJokeOptions.excludeFlags)
+                        // Assure que excludeFlags est un tableau
+                        const excludeFlags = (Array.isArray(randomJokeOptions.excludeFlags) && randomJokeOptions.excludeFlags.length > 0)
                         ? randomJokeOptions.excludeFlags
-                        : (typeof randomJokeOptions.excludeFlags === 'string' && randomJokeOptions.excludeFlags)
-                        ? randomJokeOptions.excludeFlags.split(',').map(s => s.trim()) // Split si c'est une string
+                        : (typeof randomJokeOptions.excludeFlags === 'string' && randomJokeOptions.excludeFlags.trim() !== '')
+                        ? randomJokeOptions.excludeFlags.split(',').map(s => s.trim()).filter(Boolean)
                         : [];
-
 
                         const jokeType = randomJokeOptions.jokeType;
                         const language = randomJokeOptions.language;
                         const searchString = randomJokeOptions.searchString;
                         const amount = randomJokeOptions.amount;
 
+                        // Construire le chemin des catégories (par défaut 'Any' si vide)
                         const categoryPath = (categories.length > 0 && !categories.includes('Any'))
                         ? categories.join(',')
-                        : 'Any';
+                        : 'Any'; // Utilise 'Any' seulement si aucune catégorie sélectionnée ou 'Any' est la seule sélectionnée
 
                         url = JOKEAPI_BASE_URL + `${categoryPath}`;
 
+                        // Ajouter les paramètres de requête
                         if (excludeFlags.length > 0) {
                             queryParams.push(`blacklistFlags=${excludeFlags.join(',')}`);
                         }
@@ -239,19 +242,21 @@ export class JokeApi implements INodeType {
                         if (language) {
                             queryParams.push(`lang=${language}`);
                         }
-                        if (searchString) {
-                            if (categories.length !== 1 || categories[0] === 'Any') {
-                                this.logger.warn('Search String (contains) only works when exactly ONE specific category is selected (not "Any" or multiple). Ignoring searchString.');
+                        if (searchString && searchString.trim() !== '') {
+                            // Validation pour searchString: fonctionne seulement avec 1 catégorie spécifique
+                            if (categories.length !== 1 || categories[0] === 'Any' || categories.some(cat => cat === 'Any')) {
+                                this.logger.warn(`Search String (contains) will be ignored for item ${itemIndex} because it only works when exactly ONE specific category is selected (not "Any" or multiple).`);
                             } else {
-                                queryParams.push(`contains=${encodeURIComponent(searchString)}`);
+                                queryParams.push(`contains=${encodeURIComponent(searchString.trim())}`);
                             }
                         }
-                        if (amount && amount > 1) {
+                        if (amount && amount > 1) { // Seulement si amount est un nombre et > 1
                             queryParams.push(`amount=${amount}`);
                         }
 
                         if (apiKey) {
                             // Placeholder for future API key usage if needed by JokeAPI
+                            // queryParams.push(`apiKey=${apiKey}`);
                         }
 
                         if (queryParams.length > 0) {
@@ -264,10 +269,16 @@ export class JokeApi implements INodeType {
 
                         case 'getById':
                             const jokeId = this.getNodeParameter('jokeId', itemIndex) as string;
-                            if (!jokeId) {
+                            if (!jokeId || jokeId.trim() === '') {
                                 throw new NodeOperationError(this.getNode(), 'Joke ID is required for this operation.', { itemIndex });
                             }
-                            url = JOKEAPI_BASE_URL + `Any?idRange=${encodeURIComponent(jokeId)}`;
+                            // Validation des IDs négatifs
+                            const idParts = jokeId.split('-').map(part => parseInt(part.trim(), 10));
+                            if (idParts.some(part => isNaN(part) || part < 0)) {
+                                throw new NodeOperationError(this.getNode(), `Invalid Joke ID(s) provided. IDs must be positive numbers or a range of positive numbers (e.g., "15" or "10-20"). Received: "${jokeId}"`, { itemIndex });
+                            }
+
+                            url = JOKEAPI_BASE_URL + `Any?idRange=${encodeURIComponent(jokeId.trim())}`;
 
                             this.logger.info(`Calling JokeAPI URL for getById: ${url}`);
                             response = (await axios.get(url)).data;
@@ -284,7 +295,7 @@ export class JokeApi implements INodeType {
                 }
 
                 if (response.error === true) {
-                    const errorMessage = response.message || 'JokeAPI returned an error.';
+                    const errorMessage = response.message || 'JokeAPI returned an unknown error.';
                     const errorCauses = response.causedBy ? ` Caused by: ${response.causedBy.join(', ')}.` : '';
                     throw new NodeOperationError(this.getNode(), `${errorMessage}${errorCauses}`, { itemIndex });
                 }
@@ -295,6 +306,19 @@ export class JokeApi implements INodeType {
 
             } catch (error) {
                 this.logger.error(`Error during execution for item ${itemIndex}: ${error.message}`, error);
+                // Gérer spécifiquement les erreurs Axios (par exemple, 414 URI Too Long)
+                if (axios.isAxiosError(error) && error.response) {
+                    if (error.response.status === 414) {
+                        const userFriendlyMessage = 'Request failed (HTTP 414 URI Too Long). This often happens when too many categories, exclusion flags, or a very long search string are used. Please reduce the number of filters or the length of the search string.';
+                        throw new NodeOperationError(this.getNode(), userFriendlyMessage, { itemIndex });
+                    }
+                    // Pour d'autres erreurs HTTP de l'API
+                    if (error.response.status >= 400 && error.response.status < 500) {
+                        const apiErrorMessage = error.response.data?.message || `API returned status ${error.response.status}`;
+                        throw new NodeOperationError(this.getNode(), `API Error: ${apiErrorMessage}`, { itemIndex });
+                    }
+                }
+
                 if (this.continueOnFail()) {
                     const errorData = this.helpers.returnJsonArray({ error: error.message, details: (error as Error).stack });
                     returnData.push(errorData);
