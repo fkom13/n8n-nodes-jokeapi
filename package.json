@@ -1,0 +1,58 @@
+{
+    "name": "n8n-nodes-jokeapi",
+    "version": "0.1.4",
+    "description": "Nœud n8n pour JokeAPI afin de récupérer des blagues multilingues et filtrables.",
+    "keywords": [
+        "n8n-community-node-package",
+        "jokes",
+        "jokeapi",
+        "api",
+        "multi-language"
+    ],
+    "license": "MIT",
+    "author": {
+        "name": "fkom13",
+        "email": "ericnolo13@gmail.com"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/fkom13/n8n-nodes-joke-api-tool.git"
+    },
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "tsc && gulp build",
+        "dev": "nodemon",
+        "lint": "eslint nodes/*/ credentials/*/ --fix",
+        "lintfix": "eslint packages/nodes/*/ packages/credentials/*/ --fix",
+        "prepublishOnly": "npm run build"
+    },
+    "files": [
+        "dist"
+    ],
+    "n8n": {
+        "n8nNodesApiVersion": 1,
+        "credentials": [
+            "dist/credentials/JokeApiCredentials.credentials.js"
+        ],
+        "nodes": [
+            "dist/nodes/JokeApi.node.js"
+        ]
+    },
+    "devDependencies": {
+        "@types/express": "^4.17.6",
+        "@types/request-promise-native": "^1.0.17",
+        "@typescript-eslint/eslint-plugin": "^6.7.4",
+        "@typescript-eslint/parser": "^6.7.4",
+        "dotenv": "^16.5.0",
+        "eslint": "^8.50.0",
+        "eslint-plugin-n8n-nodes-base": "^1.11.0",
+        "gulp": "^4.0.2",
+        "n8n-core": "^1.15.0",
+        "n8n-workflow": "^1.82.0",
+        "nodemon": "^2.0.20",
+        "typescript": "^5.0.0"
+    },
+    "dependencies": {
+        "axios": "^1.8.3"
+    }
+}
