@@ -1,6 +1,6 @@
 {
     "name": "n8n-nodes-jokeapi",
-    "version": "0.1.5",
+    "version": "0.1.6",
     "description": "Nœud n8n pour JokeAPI afin de récupérer des blagues multilingues et filtrables.",
     "keywords": [
         "n8n-community-node-package",
