@@ -66,11 +66,9 @@ export class JokeApi implements INodeType {
             {
                 name: 'jokeApiCredentials',
                 required: false,
-                // Ligne 'description' supprimée ici (Correction Erreur 1)
             },
         ],
         properties: [
-            // --- Basic Operation Selection ---
             {
                 displayName: 'Operation',
                 name: 'operation',
@@ -95,8 +93,6 @@ export class JokeApi implements INodeType {
                 default: 'getRandom',
                     description: 'Sélectionnez l\'opération à effectuer avec JokeAPI.',
             },
-
-            // --- Parameters for 'Get Random Joke' Operation ---
             {
                 displayName: 'Random Joke Options',
                 name: 'randomJokeOptions',
@@ -113,7 +109,7 @@ export class JokeApi implements INodeType {
                         {
                             displayName: 'Categories',
                             name: 'categories',
-                            type: 'multiOptions',
+                            type: 'multiOptions', // Le type multiOptions fournit bien un array
                             options: jokeCategories,
                 default: ['Any'],
                     description: 'Sélectionnez une ou plusieurs catégories de blagues à inclure. "Any" inclut toutes les catégories.',
@@ -121,7 +117,7 @@ export class JokeApi implements INodeType {
                         {
                             displayName: 'Exclude Flags',
                             name: 'excludeFlags',
-                            type: 'multiOptions',
+                            type: 'multiOptions', // Le type multiOptions fournit bien un array
                             options: blacklistFlags,
                 default: [],
                     description: 'Sélectionnez les drapeaux de blagues à exclure. Si une blague contient un drapeau sélectionné, elle sera filtrée (ex: NSFW, Racist).',
@@ -163,8 +159,6 @@ export class JokeApi implements INodeType {
                         },
                     ],
             },
-
-            // --- Parameters for 'Get Joke by ID' Operation ---
             {
                 displayName: 'Joke ID(s)',
                 name: 'jokeId',
@@ -202,16 +196,29 @@ export class JokeApi implements INodeType {
                 switch (operation) {
                     case 'getRandom':
                         const randomJokeOptions = this.getNodeParameter('randomJokeOptions', itemIndex) as {
-                            categories: string[];
-                            excludeFlags: string[];
+                            categories: string | string[]; // Ajusté pour accepter string ou string[]
+                            excludeFlags: string | string[]; // Ajusté pour accepter string ou string[]
                             jokeType: string;
                             language: string;
                             searchString: string;
                             amount: number;
                         };
 
-                        const categories = randomJokeOptions.categories;
-                        const excludeFlags = randomJokeOptions.excludeFlags;
+                        // CORRECTION ICI: S'assurer que categories est un tableau
+                        const categories = Array.isArray(randomJokeOptions.categories)
+                        ? randomJokeOptions.categories
+                        : (typeof randomJokeOptions.categories === 'string' && randomJokeOptions.categories)
+                        ? randomJokeOptions.categories.split(',').map(s => s.trim()) // Split si c'est une string
+                        : [];
+
+                        // CORRECTION ICI: S'assurer que excludeFlags est un tableau
+                        const excludeFlags = Array.isArray(randomJokeOptions.excludeFlags)
+                        ? randomJokeOptions.excludeFlags
+                        : (typeof randomJokeOptions.excludeFlags === 'string' && randomJokeOptions.excludeFlags)
+                        ? randomJokeOptions.excludeFlags.split(',').map(s => s.trim()) // Split si c'est une string
+                        : [];
+
+
                         const jokeType = randomJokeOptions.jokeType;
                         const language = randomJokeOptions.language;
                         const searchString = randomJokeOptions.searchString;
