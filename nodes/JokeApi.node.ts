@@ -217,7 +217,7 @@ export class JokeApi implements INodeType {
 
 				switch (operation) {
 					case 'getRandom': {
-						const randomJokeOptions = this.getNodeParameter('randomJokeOptions', itemIndex) as {
+						const randomJokeOptions = this.getNodeParameter('randomJokeOptions', itemIndex, {}) as {
 							categories?: string | string[];
 							excludeFlags?: string | string[];
 							jokeType?: string;
@@ -226,45 +226,59 @@ export class JokeApi implements INodeType {
 							amount?: number;
 						};
 
-						const rawCategories = randomJokeOptions.categories || ['Any'];
-						const categories = typeof rawCategories === 'string' ? rawCategories.split(',').map(s => s.trim()) : rawCategories;
+						// 1. Gérer les catégories
+						let categories: string[] = [];
+						const rawCategories = randomJokeOptions.categories;
+						if (typeof rawCategories === 'string' && rawCategories.trim() !== '') {
+							categories = rawCategories.split(',').map(s => s.trim());
+						} else if (Array.isArray(rawCategories) && rawCategories.length > 0) {
+							categories = rawCategories;
+						}
 
-						const rawExcludeFlags = randomJokeOptions.excludeFlags || [];
-						const excludeFlags = typeof rawExcludeFlags === 'string' ? rawExcludeFlags.split(',').map(s => s.trim()) : rawExcludeFlags;
-
-						const jokeType = randomJokeOptions.jokeType;
-						const language = randomJokeOptions.language;
-						const searchString = randomJokeOptions.searchString;
-						const amount = randomJokeOptions.amount;
-
-						const categoryPath = categories.includes('Any') ? 'Any' : categories.join(',');
+						// Si le tableau est vide après traitement, ou si 'Any' est présent, on met 'Any'
+						if (categories.length === 0 || categories.includes('Any')) {
+							categories = ['Any'];
+						}
+						const categoryPath = categories.join(',');
 						fullUrl.pathname = `/joke/${categoryPath}`;
 
+
+						// 2. Gérer les flags à exclure
+						let excludeFlags: string[] = [];
+						const rawExcludeFlags = randomJokeOptions.excludeFlags;
+						if (typeof rawExcludeFlags === 'string' && rawExcludeFlags.trim() !== '') {
+							excludeFlags = rawExcludeFlags.split(',').map(s => s.trim()).filter(Boolean);
+						} else if (Array.isArray(rawExcludeFlags)) {
+							excludeFlags = rawExcludeFlags.filter(Boolean);
+						}
 						if (excludeFlags.length > 0) {
 							fullUrl.searchParams.append('blacklistFlags', excludeFlags.join(','));
 						}
-						if (jokeType && jokeType !== '') {
+
+						// 3. Gérer les autres paramètres optionnels
+						const { jokeType, language, searchString, amount } = randomJokeOptions;
+
+						if (jokeType && jokeType !== '') { // La valeur par défaut pour 'both' est une chaîne vide
 							fullUrl.searchParams.append('type', jokeType);
 						}
-						if (language && language !== 'en') {
+
+						if (language && language !== 'en') { // 'en' est la valeur par défaut
 							fullUrl.searchParams.append('lang', language);
 						}
-						if (searchString) {
-							if (categories.length !== 1 || categories.includes('Any')) {
+
+						if (searchString && searchString.trim() !== '') {
+							if (categories.length !== 1 || categories[0] === 'Any') {
 								throw new NodeOperationError(
 									this.getNode(),
-									`Validation Error: The 'Search String' option is only allowed when exactly ONE specific category is selected (not 'Any' or multiple). Please adjust your settings.`,
+									`Validation Error: The 'Search String' option is only allowed when exactly ONE specific category is selected (not 'Any' or multiple). Current categories: ${categories.join(', ')}.`,
 									{ itemIndex },
 								);
 							}
-							fullUrl.searchParams.append('contains', searchString);
-						}
-						if (amount && amount > 1) {
-							fullUrl.searchParams.append('amount', String(amount));
+							fullUrl.searchParams.append('contains', searchString.trim());
 						}
 
-						if (apiKey) {
-							// Future use for API key if implemented by JokeAPI
+						if (amount && amount > 1) { // 1 est la valeur par défaut
+							fullUrl.searchParams.append('amount', String(amount));
 						}
 
 						this.logger.info(`Calling JokeAPI URL for getRandom: ${fullUrl.toString()}`);
