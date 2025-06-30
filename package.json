@@ -1,6 +1,6 @@
 {
     "name": "n8n-nodes-jokeapi",
-    "version": "0.1.7",
+    "version": "0.1.8",
     "description": "Nœud n8n pour JokeAPI afin de récupérer des blagues multilingues et filtrables.",
     "keywords": [
         "n8n-community-node-package",
@@ -50,7 +50,9 @@
         "n8n-core": "^1.15.0",
         "n8n-workflow": "^1.82.0",
         "nodemon": "^2.0.20",
-        "typescript": "^5.0.0"
+        "typescript": "^5.0.0",
+        "@eslint/js": "^8.50.0",
+        "@eslint/eslintrc": "^2.1.4"
     },
     "dependencies": {
         "axios": "^1.8.3"

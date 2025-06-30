@@ -175,6 +175,19 @@ export class JokeApi implements INodeType {
                     },
                     description: 'L\'ID numérique de la blague à récupérer, ou une plage d\'IDs séparée par un tiret (ex: "10-20"). Les IDs négatifs ne sont pas supportés.',
             },
+            {
+                displayName: 'Language',
+                name: 'language',
+                type: 'options',
+                options: jokeLanguages,
+                default: 'en',
+                description: 'Sélectionnez la langue de la blague souhaitée.',
+                displayOptions: {
+                    show: {
+                        operation: ['getById'],
+                    },
+                },
+            },
         ],
         usableAsTool: true,
     };
@@ -194,9 +207,10 @@ export class JokeApi implements INodeType {
                 let url: string;
                 const queryParams: string[] = [];
                 let response;
+                let language: string | undefined;
 
                 switch (operation) {
-                    case 'getRandom':
+                    case 'getRandom': {
                         const randomJokeOptions = this.getNodeParameter('randomJokeOptions', itemIndex) as {
                             categories?: string | string[]; // Rend optionnel et accepte string ou string[]
                             excludeFlags?: string | string[]; // Rend optionnel et accepte string ou string[]
@@ -221,7 +235,7 @@ export class JokeApi implements INodeType {
                         : [];
 
                         const jokeType = randomJokeOptions.jokeType;
-                        const language = randomJokeOptions.language;
+                        language = randomJokeOptions.language;
                         const searchString = randomJokeOptions.searchString;
                         const amount = randomJokeOptions.amount;
 
@@ -266,8 +280,9 @@ export class JokeApi implements INodeType {
                         this.logger.info(`Calling JokeAPI URL for getRandom: ${url}`);
                         response = (await axios.get(url)).data;
                         break;
+                    }
 
-                        case 'getById':
+                        case 'getById': {
                             const jokeId = this.getNodeParameter('jokeId', itemIndex) as string;
                             if (!jokeId || jokeId.trim() === '') {
                                 throw new NodeOperationError(this.getNode(), 'Joke ID is required for this operation.', { itemIndex });
@@ -279,10 +294,15 @@ export class JokeApi implements INodeType {
                             }
 
                             url = JOKEAPI_BASE_URL + `Any?idRange=${encodeURIComponent(jokeId.trim())}`;
+                            language = this.getNodeParameter('language', itemIndex) as string;
+                            if (language) {
+                                url += `&lang=${language}`;
+                            }
 
                             this.logger.info(`Calling JokeAPI URL for getById: ${url}`);
                             response = (await axios.get(url)).data;
                             break;
+                    }
 
                         case 'getApiInfo':
                             url = JOKEAPI_INFO_URL;
