@@ -45,6 +45,7 @@ const jokeLanguages = [
 
 // Available joke types for JokeAPI
 const jokeTypes = [
+	{ name: 'Both', value: 'both' },
 	{ name: 'Single-part joke', value: 'single' },
 	{ name: 'Two-part joke (setup & delivery)', value: 'twopart' },
 ];
@@ -133,9 +134,9 @@ export class JokeApi implements INodeType {
 						name: 'jokeType',
 						type: 'options',
 						options: jokeTypes,
-						default: 'single',
+						default: 'both',
 						description:
-							'Choisissez le format de la blague : une seule ligne ou une blague en deux parties (question et réponse).',
+							'Choisissez le format de la blague : une seule ligne, une blague en deux parties, ou les deux.',
 					},
 					{
 						displayName: 'Language',
@@ -254,17 +255,16 @@ export class JokeApi implements INodeType {
 
 						url = JOKEAPI_BASE_URL + `${categoryPath}`;
 
-						const postData: { [key: string]: any } = {};
-						const queryParams: string[] = [];
+						const queryParams: { [key: string]: any } = {};
 
 						if (excludeFlags.length > 0) {
-							postData.blacklistFlags = excludeFlags.join(',');
+							queryParams.blacklistFlags = excludeFlags.join(',');
 						}
-						if (jokeType) {
-							postData.type = jokeType;
+						if (jokeType && jokeType !== 'both') {
+							queryParams.type = jokeType;
 						}
 						if (language) {
-							postData.lang = language;
+							queryParams.lang = language;
 						}
 						if (searchString && searchString.trim() !== '') {
 							if (
@@ -276,25 +276,21 @@ export class JokeApi implements INodeType {
 									`Search String (contains) will be ignored for item ${itemIndex} because it only works when exactly ONE specific category is selected (not "Any" or multiple).`,
 								);
 							} else {
-								postData.contains = searchString.trim();
+								queryParams.contains = searchString.trim();
 							}
 						}
 						if (amount && amount > 1) {
-							queryParams.push(`amount=${amount}`);
+							queryParams.amount = amount;
 						}
 
 						if (apiKey) {
 							// Placeholder for future API key usage
 						}
 
-						if (queryParams.length > 0) {
-							url += `?${queryParams.join('&')}`;
-						}
+						this.logger.info(`Calling JokeAPI URL for getRandom: GET ${url}`);
+						this.logger.info(`Query params: ${JSON.stringify(queryParams)}`);
 
-						this.logger.info(`Calling JokeAPI URL for getRandom: POST ${url}`);
-						this.logger.info(`POST data: ${JSON.stringify(postData)}`);
-
-						response = (await axios.post(url, postData)).data;
+						response = (await axios.get(url, { params: queryParams })).data;
 						break;
 					}
 
