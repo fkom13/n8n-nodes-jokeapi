@@ -263,6 +263,10 @@ export class JokeApi implements INodeType {
 							fullUrl.searchParams.append('amount', String(amount));
 						}
 
+						if (apiKey) {
+							// Future use for API key if implemented by JokeAPI
+						}
+
 						this.logger.info(`Calling JokeAPI URL for getRandom: ${fullUrl.toString()}`);
 						response = (await axios.get(fullUrl.toString())).data;
 						break;
