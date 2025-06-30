@@ -243,10 +243,10 @@ export class JokeApi implements INodeType {
 						if (excludeFlags.length > 0) {
 							fullUrl.searchParams.append('blacklistFlags', excludeFlags.join(','));
 						}
-						if (jokeType) {
+						if (jokeType && jokeType !== '') {
 							fullUrl.searchParams.append('type', jokeType);
 						}
-						if (language) {
+						if (language && language !== 'en') {
 							fullUrl.searchParams.append('lang', language);
 						}
 						if (searchString) {
