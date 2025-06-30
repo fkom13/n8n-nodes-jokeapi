@@ -6,7 +6,7 @@ import {
 	NodeOperationError,
 } from 'n8n-workflow';
 
-import axios, { AxiosRequestConfig } from 'axios';
+import axios from 'axios';
 
 // Base URL for JokeAPI v2
 const JOKEAPI_BASE_URL = 'https://v2.jokeapi.dev';
@@ -70,10 +70,14 @@ export class JokeApi implements INodeType {
 			},
 		],
 		properties: [
+			// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+			//                              OPERATION
+			// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 			{
 				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
+				noDataExpression: true,
 				options: [
 					{
 						name: 'Get Random Joke',
@@ -89,112 +93,85 @@ export class JokeApi implements INodeType {
 						name: 'Get API Info',
 						value: 'getApiInfo',
 						description:
-							"Obtenir les informations sur l'API (catégories disponibles, flags, langues, ID range, etc.).",
+							"Obtenir les informations sur l'API (catégories disponibles, flags, langues, etc.).",
 					},
 				],
 				default: 'getRandom',
 				description: "Sélectionnez l'opération à effectuer avec JokeAPI.",
 			},
 
+			// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+			//                         GET RANDOM JOKE FIELDS
+			// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 			{
-				displayName: 'Random Joke Options',
-				name: 'randomJokeOptions',
-				type: 'collection',
-				displayOptions: {
-					show: {
-						operation: ['getRandom'],
-					},
-				},
-				placeholder: 'Ajouter des options de blague aléatoire',
+				displayName: 'Categories',
+				name: 'categories',
+				type: 'multiOptions',
+				displayOptions: { show: { operation: ['getRandom'] } },
+				options: jokeCategories,
+				default: ['Any'],
 				description:
-					'Configurez les filtres pour la blague aléatoire. Note: Des URLs trop longues dues à de nombreux filtres ou une recherche complexe peuvent entraîner des erreurs.',
-				default: {},
-				options: [
-					{
-						displayName: 'Categories',
-						name: 'categories',
-						type: 'multiOptions',
-						options: jokeCategories,
-						default: ['Any'],
-						description:
-							'Sélectionnez une ou plusieurs catégories. "Any" inclut toutes les catégories. Si "Any" est sélectionné, les autres catégories seront ignorées.',
-					},
-					{
-						displayName: 'Exclude Flags',
-						name: 'excludeFlags',
-						type: 'multiOptions',
-						options: blacklistFlags,
-						default: [],
-						description:
-							'Exclure les blagues contenant ces flags (ex: NSFW, Racist).',
-					},
-					{
-						displayName: 'Joke Type',
-						name: 'jokeType',
-						type: 'options',
-						options: jokeTypes,
-						default: '',
-						description:
-							'Choisissez le type de blague : "single", "twopart", ou laissez vide pour les deux.',
-					},
-					{
-						displayName: 'Language',
-						name: 'language',
-						type: 'options',
-						options: jokeLanguages,
-						default: 'en',
-						description: 'Sélectionnez la langue de la blague. Consultez "Get API Info" pour les langues supportées.',
-					},
-					{
-						displayName: 'Search String (contains)',
-						name: 'searchString',
-						type: 'string',
-						default: '',
-						placeholder: 'e.g. "robot"',
-						description:
-							'Rechercher une blague contenant ce texte. IMPORTANT : Ne fonctionne que si UNE SEULE catégorie spécifique est sélectionnée (pas "Any" ou plusieurs).',
-					},
-					{
-						displayName: 'Amount',
-						name: 'amount',
-						type: 'number',
-						default: 1,
-						typeOptions: {
-							minValue: 1,
-							maxValue: 10,
-						},
-						description: 'Le nombre de blagues à récupérer (1-10).',
-					},
-				],
+					'Sélectionnez une ou plusieurs catégories. "Any" inclut toutes les catégories. Si "Any" est sélectionné, les autres catégories seront ignorées.',
 			},
-
 			{
-				displayName: 'Joke ID(s)',
-				name: 'jokeId',
-				type: 'string',
+				displayName: 'Exclude Flags',
+				name: 'excludeFlags',
+				type: 'multiOptions',
+				displayOptions: { show: { operation: ['getRandom'] } },
+				options: blacklistFlags,
+				default: [],
+				description: 'Exclure les blagues contenant ces flags (ex: NSFW, Racist).',
+			},
+			{
+				displayName: 'Joke Type',
+				name: 'jokeType',
+				type: 'options',
+				displayOptions: { show: { operation: ['getRandom'] } },
+				options: jokeTypes,
 				default: '',
-				placeholder: 'e.g. 15 or 10-20',
-				required: true,
-				displayOptions: {
-					show: {
-						operation: ['getById'],
-					},
-				},
-				description:
-					'L\'ID numérique de la blague ou une plage d\'IDs (ex: "10-20").',
+				description: 'Choisissez le type de blague : "single", "twopart", ou laissez vide pour les deux.',
 			},
 			{
 				displayName: 'Language',
 				name: 'language',
 				type: 'options',
+				displayOptions: { show: { operation: ['getRandom', 'getById'] } },
 				options: jokeLanguages,
 				default: 'en',
 				description: 'Sélectionnez la langue de la blague.',
-				displayOptions: {
-					show: {
-						operation: ['getById'],
-					},
-				},
+			},
+			{
+				displayName: 'Search String (contains)',
+				name: 'searchString',
+				type: 'string',
+				displayOptions: { show: { operation: ['getRandom'] } },
+				default: '',
+				placeholder: 'e.g. "robot"',
+				description:
+					'Rechercher une blague contenant ce texte. IMPORTANT : Ne fonctionne que si UNE SEULE catégorie spécifique est sélectionnée (pas "Any" ou plusieurs).',
+			},
+			{
+				displayName: 'Amount',
+				name: 'amount',
+				type: 'number',
+				displayOptions: { show: { operation: ['getRandom'] } },
+				default: 1,
+				typeOptions: { minValue: 1, maxValue: 10 },
+				description: 'Le nombre de blagues à récupérer (1-10).',
+			},
+
+			// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+			//                           GET JOKE BY ID FIELDS
+			// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+			{
+				displayName: 'Joke ID(s)',
+				name: 'jokeId',
+				type: 'string',
+				displayOptions: { show: { operation: ['getById'] } },
+				default: '',
+				placeholder: 'e.g. 15 or 10-20',
+				required: true,
+				description: 'L\'ID numérique de la blague ou une plage d\'IDs (ex: "10-20").',
 			},
 		],
 		usableAsTool: true,
@@ -207,45 +184,36 @@ export class JokeApi implements INodeType {
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			const fullUrl = new URL(JOKEAPI_BASE_URL);
 			try {
-				const operation = this.getNodeParameter('operation', itemIndex) as string;
+				const operation = this.getNodeParameter('operation', itemIndex, 'getRandom') as string;
 				this.logger.info(`Executing operation: ${operation} for item ${itemIndex}`);
-
-				const credentials = await this.getCredentials('jokeApiCredentials');
-				const apiKey = credentials?.apiKey as string | undefined; // Not used by API, but good practice
 
 				let response;
 
 				switch (operation) {
 					case 'getRandom': {
-						const randomJokeOptions = this.getNodeParameter('randomJokeOptions', itemIndex, {}) as {
-							categories?: string | string[];
-							excludeFlags?: string | string[];
-							jokeType?: string;
-							language?: string;
-							searchString?: string;
-							amount?: number;
-						};
+						// 1. Récupérer tous les paramètres directement
+						const rawCategories = this.getNodeParameter('categories', itemIndex, ['Any']) as string | string[];
+						const rawExcludeFlags = this.getNodeParameter('excludeFlags', itemIndex, []) as string | string[];
+						const jokeType = this.getNodeParameter('jokeType', itemIndex, '') as string;
+						const language = this.getNodeParameter('language', itemIndex, 'en') as string;
+						const searchString = this.getNodeParameter('searchString', itemIndex, '') as string;
+						const amount = this.getNodeParameter('amount', itemIndex, 1) as number;
 
-						// 1. Gérer les catégories
+						// 2. Gérer les catégories
 						let categories: string[] = [];
-						const rawCategories = randomJokeOptions.categories;
 						if (typeof rawCategories === 'string' && rawCategories.trim() !== '') {
-							categories = rawCategories.split(',').map(s => s.trim());
-						} else if (Array.isArray(rawCategories) && rawCategories.length > 0) {
-							categories = rawCategories;
+							categories = rawCategories.split(',').map(s => s.trim()).filter(Boolean);
+						} else if (Array.isArray(rawCategories)) {
+							categories = rawCategories.filter(Boolean);
 						}
-
-						// Si le tableau est vide après traitement, ou si 'Any' est présent, on met 'Any'
 						if (categories.length === 0 || categories.includes('Any')) {
 							categories = ['Any'];
 						}
 						const categoryPath = categories.join(',');
 						fullUrl.pathname = `/joke/${categoryPath}`;
 
-
-						// 2. Gérer les flags à exclure
+						// 3. Gérer les flags à exclure
 						let excludeFlags: string[] = [];
-						const rawExcludeFlags = randomJokeOptions.excludeFlags;
 						if (typeof rawExcludeFlags === 'string' && rawExcludeFlags.trim() !== '') {
 							excludeFlags = rawExcludeFlags.split(',').map(s => s.trim()).filter(Boolean);
 						} else if (Array.isArray(rawExcludeFlags)) {
@@ -255,29 +223,24 @@ export class JokeApi implements INodeType {
 							fullUrl.searchParams.append('blacklistFlags', excludeFlags.join(','));
 						}
 
-						// 3. Gérer les autres paramètres optionnels
-						const { jokeType, language, searchString, amount } = randomJokeOptions;
-
-						if (jokeType && jokeType !== '') { // La valeur par défaut pour 'both' est une chaîne vide
+						// 4. Gérer les autres paramètres optionnels
+						if (jokeType) {
 							fullUrl.searchParams.append('type', jokeType);
 						}
-
-						if (language && language !== 'en') { // 'en' est la valeur par défaut
+						if (language && language !== 'en') {
 							fullUrl.searchParams.append('lang', language);
 						}
-
 						if (searchString && searchString.trim() !== '') {
 							if (categories.length !== 1 || categories[0] === 'Any') {
 								throw new NodeOperationError(
 									this.getNode(),
-									`Validation Error: The 'Search String' option is only allowed when exactly ONE specific category is selected (not 'Any' or multiple). Current categories: ${categories.join(', ')}.`,
+									`Validation Error: The 'Search String' option is only allowed when exactly ONE specific category is selected (not 'Any' or multiple). Current categories: ${categories.join(', ')}. `,
 									{ itemIndex },
 								);
 							}
 							fullUrl.searchParams.append('contains', searchString.trim());
 						}
-
-						if (amount && amount > 1) { // 1 est la valeur par défaut
+						if (amount && amount > 1) {
 							fullUrl.searchParams.append('amount', String(amount));
 						}
 
@@ -287,11 +250,11 @@ export class JokeApi implements INodeType {
 					}
 
 					case 'getById': {
-						const jokeId = this.getNodeParameter('jokeId', itemIndex) as string;
-						const language = this.getNodeParameter('language', itemIndex) as string;
+						const jokeId = this.getNodeParameter('jokeId', itemIndex, '') as string;
+						const language = this.getNodeParameter('language', itemIndex, 'en') as string;
 
 						if (!jokeId || !jokeId.trim()) {
-							throw new NodeOperationError(this.getNode(), 'Joke ID is required.', { itemIndex });
+							throw new NodeOperationError(this.getNode(), 'Joke ID is required for this operation.', { itemIndex });
 						}
 						if (/[^0-9\-]/.test(jokeId)) {
 							throw new NodeOperationError(
@@ -304,7 +267,7 @@ export class JokeApi implements INodeType {
 						fullUrl.pathname = '/joke/Any';
 						fullUrl.searchParams.append('idRange', jokeId.trim());
 
-						if (language) {
+						if (language && language !== 'en') {
 							fullUrl.searchParams.append('lang', language);
 						}
 
@@ -320,9 +283,7 @@ export class JokeApi implements INodeType {
 						break;
 
 					default:
-						throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`, {
-							itemIndex,
-						});
+						throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`, { itemIndex });
 				}
 
 				if (response.error === true) {
@@ -355,7 +316,6 @@ export class JokeApi implements INodeType {
 				}
 
 				if (error instanceof NodeOperationError) {
-					// Re-throw custom operational errors, which now include the URL
 					throw error;
 				}
 
