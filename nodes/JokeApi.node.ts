@@ -218,16 +218,20 @@ export class JokeApi implements INodeType {
 				switch (operation) {
 					case 'getRandom': {
 						const randomJokeOptions = this.getNodeParameter('randomJokeOptions', itemIndex) as {
-							categories?: string[];
-							excludeFlags?: string[];
+							categories?: string | string[];
+							excludeFlags?: string | string[];
 							jokeType?: string;
 							language?: string;
 							searchString?: string;
 							amount?: number;
 						};
 
-						const categories = randomJokeOptions.categories || ['Any'];
-						const excludeFlags = randomJokeOptions.excludeFlags || [];
+						const rawCategories = randomJokeOptions.categories || ['Any'];
+						const categories = typeof rawCategories === 'string' ? rawCategories.split(',').map(s => s.trim()) : rawCategories;
+
+						const rawExcludeFlags = randomJokeOptions.excludeFlags || [];
+						const excludeFlags = typeof rawExcludeFlags === 'string' ? rawExcludeFlags.split(',').map(s => s.trim()) : rawExcludeFlags;
+
 						const jokeType = randomJokeOptions.jokeType;
 						const language = randomJokeOptions.language;
 						const searchString = randomJokeOptions.searchString;
@@ -257,9 +261,6 @@ export class JokeApi implements INodeType {
 						}
 						if (amount && amount > 1) {
 							fullUrl.searchParams.append('amount', String(amount));
-						}
-						if (apiKey) {
-							// Future use for API key if implemented by JokeAPI
 						}
 
 						this.logger.info(`Calling JokeAPI URL for getRandom: ${fullUrl.toString()}`);
