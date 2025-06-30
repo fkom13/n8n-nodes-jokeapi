@@ -6,15 +6,14 @@ import {
 	NodeOperationError,
 } from 'n8n-workflow';
 
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 
 // Base URL for JokeAPI v2
-const JOKEAPI_BASE_URL = 'https://v2.jokeapi.dev/joke/';
-const JOKEAPI_INFO_URL = 'https://v2.jokeapi.dev/info'; // Endpoint pour les informations de l'API
+const JOKEAPI_BASE_URL = 'https://v2.jokeapi.dev';
 
 // Available categories for JokeAPI
 const jokeCategories = [
-	{ name: 'Any', value: 'Any' }, // Special category for any joke
+	{ name: 'Any', value: 'Any' },
 	{ name: 'Programming', value: 'Programming' },
 	{ name: 'Miscellaneous', value: 'Miscellaneous' },
 	{ name: 'Dark', value: 'Dark' },
@@ -23,7 +22,7 @@ const jokeCategories = [
 	{ name: 'Christmas', value: 'Christmas' },
 ];
 
-// Available blacklist flags for JokeAPI (for excluding certain joke types)
+// Available blacklist flags for JokeAPI
 const blacklistFlags = [
 	{ name: 'NSFW (Not Safe For Work)', value: 'nsfw' },
 	{ name: 'Religious', value: 'religious' },
@@ -40,12 +39,12 @@ const jokeLanguages = [
 	{ name: 'Spanish (es)', value: 'es' },
 	{ name: 'French (fr)', value: 'fr' },
 	{ name: 'Portuguese (pt)', value: 'pt' },
-	{ name: 'Czech (cz)', value: 'cz' },
+	{ name: 'Czech (cs)', value: 'cs' },
 ];
 
 // Available joke types for JokeAPI
 const jokeTypes = [
-	{ name: 'Both', value: 'both' },
+	{ name: 'Both', value: '' },
 	{ name: 'Single-part joke', value: 'single' },
 	{ name: 'Two-part joke (setup & delivery)', value: 'twopart' },
 ];
@@ -84,7 +83,7 @@ export class JokeApi implements INodeType {
 					{
 						name: 'Get Joke by ID',
 						value: 'getById',
-						description: 'Obtenir une blague spécifique à partir de son ID.',
+						description: 'Obtenir une blague spécifique à partir de son ID ou d\'une plage d\'IDs.',
 					},
 					{
 						name: 'Get API Info',
@@ -118,7 +117,7 @@ export class JokeApi implements INodeType {
 						options: jokeCategories,
 						default: ['Any'],
 						description:
-							'Sélectionnez une ou plusieurs catégories de blagues à inclure. "Any" inclut toutes les catégories. Note: Un trop grand nombre de catégories peut rendre l\'URL longue.',
+							'Sélectionnez une ou plusieurs catégories. "Any" inclut toutes les catégories. Si "Any" est sélectionné, les autres catégories seront ignorées.',
 					},
 					{
 						displayName: 'Exclude Flags',
@@ -127,16 +126,16 @@ export class JokeApi implements INodeType {
 						options: blacklistFlags,
 						default: [],
 						description:
-							'Sélectionnez les drapeaux de blagues à exclure. Si une blague contient un drapeau sélectionné, elle sera filtrée (ex: NSFW, Racist). Note: Un trop grand nombre de flags peut rendre l\'URL longue.',
+							'Exclure les blagues contenant ces flags (ex: NSFW, Racist).',
 					},
 					{
 						displayName: 'Joke Type',
 						name: 'jokeType',
 						type: 'options',
 						options: jokeTypes,
-						default: 'both',
+						default: '',
 						description:
-							'Choisissez le format de la blague : une seule ligne, une blague en deux parties, ou les deux.',
+							'Choisissez le type de blague : "single", "twopart", ou laissez vide pour les deux.',
 					},
 					{
 						displayName: 'Language',
@@ -144,7 +143,7 @@ export class JokeApi implements INodeType {
 						type: 'options',
 						options: jokeLanguages,
 						default: 'en',
-						description: 'Sélectionnez la langue de la blague souhaitée.',
+						description: 'Sélectionnez la langue de la blague. Consultez "Get API Info" pour les langues supportées.',
 					},
 					{
 						displayName: 'Search String (contains)',
@@ -153,7 +152,7 @@ export class JokeApi implements INodeType {
 						default: '',
 						placeholder: 'e.g. "robot"',
 						description:
-							'Recherchez une blague contenant ce texte. Note : cette option ne fonctionne que si UNE SEULE catégorie est sélectionnée (pas "Any" et pas plusieurs catégories). Une longue chaîne peut rendre l\'URL longue.',
+							'Rechercher une blague contenant ce texte. IMPORTANT : Ne fonctionne que si UNE SEULE catégorie spécifique est sélectionnée (pas "Any" ou plusieurs).',
 					},
 					{
 						displayName: 'Amount',
@@ -164,7 +163,7 @@ export class JokeApi implements INodeType {
 							minValue: 1,
 							maxValue: 10,
 						},
-						description: 'Le nombre de blagues aléatoires à récupérer (entre 1 et 10).',
+						description: 'Le nombre de blagues à récupérer (1-10).',
 					},
 				],
 			},
@@ -182,7 +181,7 @@ export class JokeApi implements INodeType {
 					},
 				},
 				description:
-					'L\'ID numérique de la blague à récupérer, ou une plage d\'IDs séparée par un tiret (ex: "10-20"). Les IDs négatifs ne sont pas supportés.',
+					'L\'ID numérique de la blague ou une plage d\'IDs (ex: "10-20").',
 			},
 			{
 				displayName: 'Language',
@@ -190,7 +189,7 @@ export class JokeApi implements INodeType {
 				type: 'options',
 				options: jokeLanguages,
 				default: 'en',
-				description: 'Sélectionnez la langue de la blague souhaitée.',
+				description: 'Sélectionnez la langue de la blague.',
 				displayOptions: {
 					show: {
 						operation: ['getById'],
@@ -206,125 +205,99 @@ export class JokeApi implements INodeType {
 		const returnData: INodeExecutionData[][] = [];
 
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+			const fullUrl = new URL(JOKEAPI_BASE_URL);
 			try {
 				const operation = this.getNodeParameter('operation', itemIndex) as string;
 				this.logger.info(`Executing operation: ${operation} for item ${itemIndex}`);
 
 				const credentials = await this.getCredentials('jokeApiCredentials');
-				const apiKey = credentials?.apiKey as string | undefined;
+				const apiKey = credentials?.apiKey as string | undefined; // Not used by API, but good practice
 
-				let url: string;
 				let response;
-				let language: string | undefined;
 
 				switch (operation) {
 					case 'getRandom': {
 						const randomJokeOptions = this.getNodeParameter('randomJokeOptions', itemIndex) as {
-							categories?: string | string[];
-							excludeFlags?: string | string[];
+							categories?: string[];
+							excludeFlags?: string[];
 							jokeType?: string;
 							language?: string;
 							searchString?: string;
 							amount?: number;
 						};
 
-						const categories =
-							Array.isArray(randomJokeOptions.categories) && randomJokeOptions.categories.length > 0
-								? randomJokeOptions.categories
-								: typeof randomJokeOptions.categories === 'string' &&
-								  randomJokeOptions.categories.trim() !== ''
-								? randomJokeOptions.categories.split(',').map((s) => s.trim()).filter(Boolean)
-								: [];
-
-						const excludeFlags =
-							Array.isArray(randomJokeOptions.excludeFlags) &&
-							randomJokeOptions.excludeFlags.length > 0
-								? randomJokeOptions.excludeFlags
-								: typeof randomJokeOptions.excludeFlags === 'string' &&
-								  randomJokeOptions.excludeFlags.trim() !== ''
-								? randomJokeOptions.excludeFlags.split(',').map((s) => s.trim()).filter(Boolean)
-								: [];
-
+						const categories = randomJokeOptions.categories || ['Any'];
+						const excludeFlags = randomJokeOptions.excludeFlags || [];
 						const jokeType = randomJokeOptions.jokeType;
-						language = randomJokeOptions.language;
+						const language = randomJokeOptions.language;
 						const searchString = randomJokeOptions.searchString;
 						const amount = randomJokeOptions.amount;
 
-						const categoryPath =
-							categories.length > 0 && !categories.includes('Any') ? categories.join(',') : 'Any';
-
-						url = JOKEAPI_BASE_URL + `${categoryPath}`;
-
-						const queryParams: { [key: string]: any } = {};
+						const categoryPath = categories.includes('Any') ? 'Any' : categories.join(',');
+						fullUrl.pathname = `/joke/${categoryPath}`;
 
 						if (excludeFlags.length > 0) {
-							queryParams.blacklistFlags = excludeFlags.join(',');
+							fullUrl.searchParams.append('blacklistFlags', excludeFlags.join(','));
 						}
-						if (jokeType && jokeType !== 'both') {
-							queryParams.type = jokeType;
+						if (jokeType) {
+							fullUrl.searchParams.append('type', jokeType);
 						}
 						if (language) {
-							queryParams.lang = language;
+							fullUrl.searchParams.append('lang', language);
 						}
-						if (searchString && searchString.trim() !== '') {
-							if (
-								categories.length !== 1 ||
-								categories[0] === 'Any' ||
-								categories.some((cat) => cat === 'Any')
-							) {
-								this.logger.warn(
-									`Search String (contains) will be ignored for item ${itemIndex} because it only works when exactly ONE specific category is selected (not "Any" or multiple).`,
+						if (searchString) {
+							if (categories.length !== 1 || categories.includes('Any')) {
+								throw new NodeOperationError(
+									this.getNode(),
+									`Validation Error: The 'Search String' option is only allowed when exactly ONE specific category is selected (not 'Any' or multiple). Please adjust your settings.`,
+									{ itemIndex },
 								);
-							} else {
-								queryParams.contains = searchString.trim();
 							}
+							fullUrl.searchParams.append('contains', searchString);
 						}
 						if (amount && amount > 1) {
-							queryParams.amount = amount;
+							fullUrl.searchParams.append('amount', String(amount));
 						}
-
 						if (apiKey) {
-							// Placeholder for future API key usage
+							// Future use for API key if implemented by JokeAPI
 						}
 
-						this.logger.info(`Calling JokeAPI URL for getRandom: GET ${url}`);
-						this.logger.info(`Query params: ${JSON.stringify(queryParams)}`);
-
-						response = (await axios.get(url, { params: queryParams })).data;
+						this.logger.info(`Calling JokeAPI URL for getRandom: ${fullUrl.toString()}`);
+						response = (await axios.get(fullUrl.toString())).data;
 						break;
 					}
 
 					case 'getById': {
 						const jokeId = this.getNodeParameter('jokeId', itemIndex) as string;
-						if (!jokeId || jokeId.trim() === '') {
-							throw new NodeOperationError(this.getNode(), 'Joke ID is required for this operation.', {
-								itemIndex,
-							});
+						const language = this.getNodeParameter('language', itemIndex) as string;
+
+						if (!jokeId || !jokeId.trim()) {
+							throw new NodeOperationError(this.getNode(), 'Joke ID is required.', { itemIndex });
 						}
-						const idParts = jokeId.split('-').map((part) => parseInt(part.trim(), 10));
-						if (idParts.some((part) => isNaN(part) || part < 0)) {
+						if (/[^0-9\-]/.test(jokeId)) {
 							throw new NodeOperationError(
 								this.getNode(),
-								`Invalid Joke ID(s) provided. IDs must be positive numbers or a range of positive numbers (e.g., "15" or "10-20"). Received: "${jokeId}" `,
+								`Invalid characters in Joke ID. Only numbers and hyphens are allowed. Received: "${jokeId}"`,
 								{ itemIndex },
 							);
 						}
 
-						url = JOKEAPI_BASE_URL + `Any?idRange=${encodeURIComponent(jokeId.trim())}`;
-						language = this.getNodeParameter('language', itemIndex) as string;
+						fullUrl.pathname = '/joke/Any';
+						fullUrl.searchParams.append('idRange', jokeId.trim());
+
 						if (language) {
-							url += `&lang=${language}`;
+							fullUrl.searchParams.append('lang', language);
 						}
 
-						this.logger.info(`Calling JokeAPI URL for getById: ${url}`);
-						response = (await axios.get(url)).data;
+						this.logger.info(`Calling JokeAPI URL for getById: ${fullUrl.toString()}`);
+						response = (await axios.get(fullUrl.toString())).data;
 						break;
 					}
 
 					case 'getApiInfo':
-						url = JOKEAPI_INFO_URL;
-						this.logger.info(`Calling JokeAPI URL for getApiInfo: ${url}`);
-						response = (await axios.get(url)).data;
+						fullUrl.pathname = '/info';
+						this.logger.info(`Calling JokeAPI URL for getApiInfo: ${fullUrl.toString()}`);
+						response = (await axios.get(fullUrl.toString())).data;
 						break;
 
 					default:
@@ -335,46 +308,59 @@ export class JokeApi implements INodeType {
 
 				if (response.error === true) {
 					const errorMessage = response.message || 'JokeAPI returned an unknown error.';
-					const errorCauses = response.causedBy
-						? ` Caused by: ${response.causedBy.join(', ')}.`
-						: '';
-					throw new NodeOperationError(this.getNode(), `${errorMessage}${errorCauses}`, { itemIndex });
+					const additionalInfo = response.additionalInfo ? ` Details: ${response.additionalInfo}` : '';
+					throw new NodeOperationError(
+						this.getNode(),
+						`API Error: ${errorMessage}${additionalInfo}. Requested URL: ${fullUrl.toString()}`,
+						{ itemIndex },
+					);
 				}
 
 				const executionData = this.helpers.returnJsonArray(
-					Array.isArray(response) ? response : [response],
+					response.jokes || (Array.isArray(response) ? response : [response]),
 				);
 				returnData.push(executionData);
 				this.logger.info(`Operation ${operation} successful for item ${itemIndex}`);
+
 			} catch (error) {
 				this.logger.error(`Error during execution for item ${itemIndex}: ${error.message}`, error);
-				if (axios.isAxiosError(error) && error.response) {
-					if (error.response.status === 414) {
-						const userFriendlyMessage =
-							'Request failed (HTTP 414 URI Too Long). This often happens when too many categories, exclusion flags, or a very long search string are used. Please reduce the number of filters or the length of the search string.';
-						throw new NodeOperationError(this.getNode(), userFriendlyMessage, { itemIndex });
-					}
-					if (error.response.status >= 400 && error.response.status < 500) {
-						const apiErrorMessage =
-							error.response.data?.message || `API returned status ${error.response.status}`;
-						throw new NodeOperationError(this.getNode(), `API Error: ${apiErrorMessage}`, {
-							itemIndex,
-						});
-					}
-				}
 
 				if (this.continueOnFail()) {
 					const errorData = this.helpers.returnJsonArray({
 						error: error.message,
+						failedUrl: fullUrl.toString(),
 						details: (error as Error).stack,
 					});
 					returnData.push(errorData);
 					continue;
 				}
+
 				if (error instanceof NodeOperationError) {
+					// Re-throw custom operational errors, which now include the URL
 					throw error;
 				}
-				throw new NodeOperationError(this.getNode(), error, { itemIndex });
+
+				if (axios.isAxiosError(error)) {
+					const builtUrl = fullUrl.toString();
+					if (error.response) {
+						const { status, data } = error.response;
+						const apiMessage = data?.message || 'No additional message from API.';
+						const additionalInfo = data?.additionalInfo ? ` Details: ${data.additionalInfo}` : '';
+						throw new NodeOperationError(
+							this.getNode(),
+							`HTTP ${status} - ${apiMessage}${additionalInfo} - Failed URL: ${builtUrl}`,
+							{ itemIndex },
+						);
+					} else {
+						throw new NodeOperationError(
+							this.getNode(),
+							`Network Error: ${error.message}. Could not reach URL: ${builtUrl}`,
+							{ itemIndex },
+						);
+					}
+				}
+
+				throw new NodeOperationError(this.getNode(), `Unknown Error: ${error.message}. Requested URL: ${fullUrl.toString()}`, { itemIndex });
 			}
 		}
 		return returnData;
